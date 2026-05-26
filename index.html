@@ -611,11 +611,16 @@ window.leaveRoom = () => {
   if (currentRoom && isTeacher) remove(getRoomRef(currentRoom));
   currentRoom = null; currentGroupId = null; isTeacher = false;
   
-  // Reset initial state for next setup
-  pendingTeacherPin = generatePin();
-  document.getElementById('setup-pin').textContent = pendingTeacherPin;
-  window.showScreen('screen-landing');
-};
+  // ── INIT SETUP PIN ──
+pendingTeacherPin = generatePin();
+document.getElementById('setup-pin').textContent = pendingTeacherPin;
+
+const pinInput = document.getElementById('join-pin');
+pinInput.addEventListener('input', () => {
+  if (joinStep === 1) {
+    document.getElementById('join-error').style.display = 'none';
+  }
+});
 
 // ── TEACHER: LISTEN ──
 function listenTeacher(pin) {
