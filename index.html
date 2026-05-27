@@ -385,6 +385,21 @@
 
   /* ── EMPTY STATE ── */
   .empty-state { color: var(--muted); font-weight: 700; font-size: 0.9rem; text-align: center; padding: 24px; }
+/* ── COPYRIGHT FOOTER ── */
+  .copyright-footer {
+    position: fixed;
+    bottom: 12px;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    z-index: 1000;
+    pointer-events: none; /* เพื่อไม่ให้ตัวหนังสือไปขัดขวางการกดปุ่ม */
+    opacity: 0.6;
+  }
 </style>
 </head>
 <body>
@@ -897,5 +912,6 @@ window.addEventListener('load', () => {
   }
 });
 </script>
+  <div class="copyright-footer">© Created by SUKI SUPAKON KEANCHA</div>
 </body>
 </html>
