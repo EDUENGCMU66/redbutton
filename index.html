@@ -690,8 +690,14 @@ function renderGroups(groups) {
     keys.forEach(k => { if ((groups[k].clicks||0) > max) { max = groups[k].clicks||0; winner = k; } });
   }
 
+  // แก้ไข: เช็คว่าหน้าจอสร้างกล่องตัวเลขหรือยัง ถ้ายังให้สร้างใหม่ก่อน
+  let missingScore = false;
+  keys.forEach(k => {
+    if (!document.getElementById(`gc-${k}`)) missingScore = true;
+  });
+
   // 🔴 เคล็ดลับความเสถียรฝั่งครู
-  if (gamePhase === 'playing' && grid.children.length === keys.length) {
+  if (gamePhase === 'playing' && grid.children.length === keys.length && !missingScore) {
     keys.forEach(k => {
       const countEl = document.getElementById(`gc-${k}`);
       if (countEl) countEl.textContent = groups[k].clicks || 0;
