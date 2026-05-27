@@ -333,9 +333,10 @@
     pointer-events: none;
   }
 
+/* ── แก้ไข CSS เพื่อให้ปุ่มอยู่กับที่ ── */
   .big-btn-wrap.pressing .big-btn-top {
-    transform: translateY(8px) scale(0.97);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.6) inset, 0 0 60px rgba(255,34,68,0.6);
+    /* transform: translateY(8px) scale(0.97); */ /* คอมเมนต์หรือลบบรรทัดนี้ออก เพื่อไม่ให้ปุ่มขยับลงและย่อตัว */
+    box-shadow: 0 2px 6px rgba(0,0,0,0.6) inset, 0 0 60px rgba(255,34,68,0.6); /* เก็บแสงเรืองรองไว้ เพื่อบอกว่ากดแล้ว */
   }
   .big-btn-wrap.pressing .big-btn-shadow { width: 85%; opacity: 0.5; }
   .big-btn-wrap.pressing .big-btn-icon { transform: scale(0.9); }
@@ -865,14 +866,19 @@ function showStudentResult() {
 let clickBuffer = 0;
 let flushInterval = null;
 
+// ── แก้ไขฟังก์ชัน SMASH ──
 window.smash = () => {
   if (gamePhase !== 'playing') return;
   const btn = document.getElementById('big-btn');
   if (btn.classList.contains('locked')) return;
 
-  btn.classList.add('pressing', 'shake');
-  setTimeout(() => btn.classList.remove('pressing', 'shake'), 150);
+  // --- แก้ไขตรงนี้ ---
+  // นำ 'shake' ออก (เพื่อให้ปุ่มไม่สั่น) เหลือแค่ 'pressing' เพื่อแสดงผลแสง
+  btn.classList.add('pressing'); 
+  setTimeout(() => btn.classList.remove('pressing'), 150);
   
+  // --- คอมเมนต์หรือลบโค้ดส่วนนี้ออกทั้งหมด เพื่อเอา +1 ออก ---
+  /*
   const el = document.createElement('div');
   el.className = 'float-up';
   el.textContent = '+1';
@@ -880,6 +886,8 @@ window.smash = () => {
   el.style.top = '30%';
   btn.parentElement.appendChild(el);
   setTimeout(() => el.remove(), 900);
+  */
+  // --- จบการแก้ไข ---
 
   clickBuffer++;
   localCount++;
