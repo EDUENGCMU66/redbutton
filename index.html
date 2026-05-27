@@ -123,15 +123,26 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 16px;
     background: var(--surface);
     border-radius: var(--radius);
     padding: 16px 20px;
     border: 1px solid rgba(255,255,255,0.07);
   }
-  .dash-header .logo-sm { font-family: var(--font-h); font-size: 1.4rem; }
-  .dash-header .logo-sm span { color: var(--red); }
+  
+  .qr-code-box {
+    background: #fff;
+    padding: 8px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--accent);
+  }
+  .qr-code-box img { width: 80px; height: 80px; }
 
+  .header-left { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  
   .pin-badge {
     background: var(--surface2);
     border-radius: 12px;
@@ -344,23 +355,6 @@
   .big-btn-wrap.locked .big-btn-top { filter: brightness(0.5) saturate(0.3); cursor: not-allowed; }
   .big-btn-wrap.locked { cursor: not-allowed; }
 
-  /* ── FLOATING NUMBERS ── */
-  .float-up {
-    position: absolute;
-    font-family: var(--font-h);
-    font-size: 1.4rem;
-    color: var(--gold);
-    text-shadow: 0 2px 8px rgba(0,0,0,0.6);
-    pointer-events: none;
-    animation: floatUp 0.9s ease forwards;
-    z-index: 10;
-  }
-  @keyframes floatUp {
-    0% { opacity: 1; transform: translateY(0) scale(1); }
-    60% { opacity: 1; transform: translateY(-50px) scale(1.2); }
-    100% { opacity: 0; transform: translateY(-90px) scale(0.8); }
-  }
-
   /* ── RESULT BLAST ── */
   .result-overlay {
     position: fixed;
@@ -384,21 +378,6 @@
   @keyframes countBlast { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
   .result-label { font-weight: 800; font-size: 1rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
 
-  /* ── CONFETTI ── */
-  .confetti-piece {
-    position: fixed;
-    width: 10px;
-    height: 10px;
-    top: -20px;
-    border-radius: 2px;
-    animation: confettiFall linear forwards;
-    z-index: 99;
-  }
-  @keyframes confettiFall {
-    0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-    100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-  }
-
   /* ── STUDENT TIMER ── */
   .student-timer { font-family: var(--font-h); font-size: 2.2rem; color: var(--cyan); }
   .student-timer.urgent { color: var(--red); animation: urgentPulse 0.5s ease-in-out infinite; }
@@ -406,17 +385,6 @@
 
   /* ── EMPTY STATE ── */
   .empty-state { color: var(--muted); font-weight: 700; font-size: 0.9rem; text-align: center; padding: 24px; }
-
-  /* ── SCROLLBAR ── */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 4px; }
-
-  /* ── RESPONSIVE ── */
-  @media (min-width: 600px) {
-    #screen-teacher { padding: 20px; }
-    .big-btn-wrap { width: 260px; height: 260px; }
-  }
 </style>
 </head>
 <body>
@@ -442,7 +410,7 @@
     </div>
     <div style="display:flex; gap:10px; margin-top:8px;">
       <button class="btn btn-secondary" style="flex:1" onclick="window.showScreen('screen-landing')">← Back</button>
-      <button class="btn btn-primary" style="flex:2" onclick="window.createRoom()">Create Room 🚀</button>
+      <button class="btn btn-primary" style="flex:2" id="create-room-btn" onclick="window.createRoom()">Create Room 🚀</button>
     </div>
   </div>
 </div>
@@ -454,26 +422,29 @@
       <label>Room PIN</label>
       <input type="text" id="join-pin" placeholder="Enter PIN" maxlength="6" style="font-size:1.5rem; text-align:center; letter-spacing:0.2em;">
     </div>
-    <div id="join-name-section" style="display:none">
-      <div class="input-group">
-        <label>Group Name</label>
-        <input type="text" id="join-name" placeholder="e.g. Team Alpha" maxlength="20">
-      </div>
+    <div class="input-group">
+      <label>Group Name</label>
+      <input type="text" id="join-name" placeholder="e.g. Group A" maxlength="20">
     </div>
     <div id="join-error" style="color:#ff6680; font-size:0.85rem; font-weight:700; margin-bottom:10px; display:none;"></div>
     <div style="display:flex; gap:10px; margin-top:8px;">
       <button class="btn btn-secondary" style="flex:1" onclick="window.showScreen('screen-landing')">← Back</button>
-      <button class="btn btn-primary" style="flex:2" id="join-btn" onclick="window.handleJoin()">Next →</button>
+      <button class="btn btn-primary" style="flex:2" id="join-btn" onclick="window.handleJoin()">Join Room →</button>
     </div>
   </div>
 </div>
 
 <div id="screen-teacher" class="screen">
   <div class="dash-header">
-    <div class="logo-sm">🔴 Button <span>Bash</span></div>
-    <div class="pin-badge">
-      <div class="pin-l">Room PIN</div>
-      <div class="pin-n" id="dash-pin">----</div>
+    <div class="header-left">
+      <div class="qr-code-box"><img id="dash-qr" src="" alt="QR Code"></div>
+      <div>
+        <div style="color:var(--muted); font-size:0.75rem; font-weight:800; letter-spacing:0.1em; margin-bottom:4px;">SCAN TO JOIN</div>
+        <div class="pin-badge">
+          <div class="pin-l">Room PIN</div>
+          <div class="pin-n" id="dash-pin">----</div>
+        </div>
+      </div>
     </div>
     <button class="btn btn-secondary" onclick="window.leaveRoom()" style="padding:10px 16px; font-size:0.85rem;">Exit</button>
   </div>
@@ -500,7 +471,7 @@
   <div class="groups-section">
     <h3 id="groups-title">👥 Waiting Room <span id="group-count" style="color:var(--muted);font-size:0.85rem;"></span></h3>
     <div class="groups-grid" id="groups-grid">
-      <div class="empty-state">No groups yet. Share the PIN!</div>
+      <div class="empty-state">No groups yet. Share the PIN or QR!</div>
     </div>
   </div>
 </div>
@@ -510,7 +481,7 @@
     <div class="student-header">
       <div class="student-avatar"><img id="s-avatar" src="" alt="avatar"></div>
       <div class="student-name-info">
-        <div class="sname" id="s-name">Team Alpha</div>
+        <div class="sname" id="s-name">Group Name</div>
         <div class="sroom">Room <span id="s-room">----</span></div>
       </div>
       <div class="student-click-count" id="s-count">0</div>
@@ -550,6 +521,10 @@ import { getDatabase, ref, set, get, update, onValue, remove, push, increment }
 const firebaseConfig = {
   apiKey: "AIzaSyDtyNbOFT8UVan7-jvpLf1BN5tbpfn-BBQ",
   authDomain: "redbotton-3151e.firebaseapp.com",
+  
+  // 👇 เพิ่มบรรทัดนี้ และวางลิงก์ที่คุณก็อปปี้มา (อย่าลืมใส่ลูกน้ำด้านหลัง)
+  databaseURL: "https://redbotton-3151e-default-rtdb.asia-southeast1.firebasedatabase.app", 
+  
   projectId: "redbotton-3151e",
   storageBucket: "redbotton-3151e.firebasestorage.app",
   messagingSenderId: "100948480364",
@@ -560,7 +535,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ── STATE ──
 let currentRoom = null;
 let currentGroupId = null;
 let currentGroupName = null;
@@ -570,8 +544,6 @@ let timerDuration = 10;
 let timerRemaining = 10;
 let gamePhase = 'waiting'; 
 let localCount = 0;
-let joinStep = 1; 
-let pendingPin = null;
 let pendingTeacherPin = null;
 
 // ── HELPERS ──
@@ -596,31 +568,31 @@ function getGroupRef(pin, gid) { return ref(db, `rooms/${pin}/groups/${gid}`); }
 window.createRoom = async () => {
   const pin = pendingTeacherPin;
   const td = parseInt(document.getElementById('setup-timer').value) || 10;
+  const btn = document.getElementById('create-room-btn');
   
-  // เปลี่ยนข้อความปุ่มระหว่างรอ
-  const btn = document.querySelector('#screen-teacher-setup .btn-primary');
   btn.textContent = 'Creating...';
   btn.disabled = true;
 
   try {
-    // พยายามบันทึกข้อมูลลง Firebase
     await set(getRoomRef(pin), { pin, timerDuration: td, phase: 'waiting', createdAt: Date.now() });
     
-    // ถ้าสำเร็จ ให้เปลี่ยนหน้า
     currentRoom = pin;
     timerDuration = td;
     isTeacher = true;
     document.getElementById('dash-pin').textContent = pin;
     document.getElementById('dash-timer-input').value = td;
+    
+    // Generate QR Code with PIN auto-fill URL
+    const currentUrl = window.location.origin + window.location.pathname;
+    const joinUrl = `${currentUrl}?pin=${pin}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(joinUrl)}&color=000000&bgcolor=ffffff`;
+    document.getElementById('dash-qr').src = qrUrl;
+
     window.showScreen('screen-teacher');
     listenTeacher(pin);
-
   } catch (error) {
-    // ถ้าไม่สำเร็จ ให้แจ้งเตือนสาเหตุ
-    alert("❌ ไม่สามารถสร้างห้องได้ สาเหตุ:\n" + error.message + "\n\n(อย่าลืมไปปรับ Rules ใน Firebase ให้เป็น true นะครับ)");
-    console.error(error);
+    alert("❌ ไม่สามารถสร้างห้องได้ โปรดตรวจสอบว่ารันผ่านเว็บไซต์จริงๆ (ไม่ใช่ file://) หรือเช็คสิทธิ์ Firebase ครับ\n" + error.message);
   } finally {
-    // คืนค่าปุ่มกลับมาเหมือนเดิม
     btn.textContent = 'Create Room 🚀';
     btn.disabled = false;
   }
@@ -631,13 +603,11 @@ window.leaveRoom = () => {
   if (currentRoom && isTeacher) remove(getRoomRef(currentRoom));
   currentRoom = null; currentGroupId = null; isTeacher = false;
   
-  // Reset initial state for next setup
   pendingTeacherPin = generatePin();
   document.getElementById('setup-pin').textContent = pendingTeacherPin;
   window.showScreen('screen-landing');
 };
 
-// ── TEACHER: LISTEN ──
 function listenTeacher(pin) {
   onValue(getGroupsRef(pin), snap => {
     const groups = snap.val() || {};
@@ -653,7 +623,7 @@ function renderGroups(groups) {
   const grid = document.getElementById('groups-grid');
   const keys = Object.keys(groups);
   document.getElementById('group-count').textContent = keys.length ? `(${keys.length})` : '';
-  if (!keys.length) { grid.innerHTML = '<div class="empty-state">No groups yet. Share the PIN!</div>'; return; }
+  if (!keys.length) { grid.innerHTML = '<div class="empty-state">No groups yet. Share the PIN or QR!</div>'; return; }
 
   let winner = null;
   if (gamePhase === 'ended') {
@@ -676,7 +646,6 @@ function renderGroups(groups) {
   }).join('');
 }
 
-// ── TEACHER: START GAME ──
 window.startGame = async () => {
   if (!currentRoom) return;
   const td = parseInt(document.getElementById('dash-timer-input').value) || 10;
@@ -721,16 +690,10 @@ function updateTimerUI(remaining, total) {
   numEl.textContent = remaining;
   const pct = (remaining / total) * 100;
   barEl.style.width = pct + '%';
-  if (remaining <= 3) {
-    numEl.classList.add('urgent');
-    barEl.classList.add('urgent');
-  } else {
-    numEl.classList.remove('urgent');
-    barEl.classList.remove('urgent');
-  }
+  if (remaining <= 3) { numEl.classList.add('urgent'); barEl.classList.add('urgent'); } 
+  else { numEl.classList.remove('urgent'); barEl.classList.remove('urgent'); }
 }
 
-// ── TEACHER: RESET ──
 window.resetGame = async () => {
   if (!currentRoom) return;
   clearInterval(timerInterval);
@@ -746,47 +709,42 @@ window.resetGame = async () => {
   await update(ref(db), updates);
 };
 
-// ── STUDENT: JOIN ──
+// ── STUDENT: JOIN (STREAMLINED) ──
 window.handleJoin = async () => {
+  const pin = document.getElementById('join-pin').value.trim();
+  const name = document.getElementById('join-name').value.trim();
   const joinBtn = document.getElementById('join-btn');
   const errEl = document.getElementById('join-error');
   errEl.style.display = 'none';
 
-  if (joinStep === 1) {
-    const pin = document.getElementById('join-pin').value.trim();
-    if (!pin) return;
-    joinBtn.disabled = true;
-    joinBtn.textContent = 'Checking…';
+  if (!pin || !name) {
+    errEl.textContent = '❌ โปรดกรอกทั้ง PIN และชื่อกลุ่มให้ครบถ้วน';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  joinBtn.disabled = true;
+  joinBtn.textContent = 'Joining...';
+  
+  try {
     const snap = await get(getRoomRef(pin));
-    joinBtn.disabled = false;
-    
     if (!snap.exists()) {
-      errEl.textContent = '❌ Room not found. Check the PIN!';
+      errEl.textContent = '❌ ไม่พบห้องนี้ โปรดเช็ค PIN อีกครั้ง!';
       errEl.style.display = 'block';
-      joinBtn.textContent = 'Next →';
+      joinBtn.disabled = false;
+      joinBtn.textContent = 'Join Room →';
       return;
     }
-    pendingPin = pin;
-    joinStep = 2;
-    document.getElementById('join-name-section').style.display = 'block';
-    document.getElementById('join-pin').disabled = true;
-    joinBtn.textContent = 'Join Room →';
-  } else {
-    const name = document.getElementById('join-name').value.trim();
-    if (!name) return;
-    joinBtn.disabled = true;
-    joinBtn.textContent = 'Joining…';
-    await joinRoom(pendingPin, name);
     
-    // Reset join UI states for future
-    joinBtn.disabled = false;
-    joinBtn.textContent = 'Next →';
-    joinStep = 1;
-    document.getElementById('join-pin').disabled = false;
-    document.getElementById('join-pin').value = '';
-    document.getElementById('join-name').value = '';
-    document.getElementById('join-name-section').style.display = 'none';
+    // Jump straight into the room
+    await joinRoom(pin, name);
+  } catch(error) {
+    errEl.textContent = '❌ เชื่อมต่อไม่สำเร็จ: ' + error.message;
+    errEl.style.display = 'block';
   }
+
+  joinBtn.disabled = false;
+  joinBtn.textContent = 'Join Room →';
 };
 
 async function joinRoom(pin, name) {
@@ -806,7 +764,6 @@ async function joinRoom(pin, name) {
   listenStudent(pin, gid);
 }
 
-// ── STUDENT: LISTEN ──
 function listenStudent(pin, gid) {
   onValue(ref(db, `rooms/${pin}/phase`), snap => {
     const ph = snap.val();
@@ -886,7 +843,7 @@ function showStudentResult() {
   document.getElementById('result-emoji').textContent = localCount > 30 ? '🏆' : localCount > 15 ? '🎉' : '👏';
   document.getElementById('result-msg').textContent = localCount > 25 ? 'Amazing! 🔥' : localCount > 10 ? 'Nice work!' : 'Keep it up!';
   overlay.classList.add('show');
-  if (localCount > 5) spawnConfetti();
+  // if (localCount > 5) spawnConfetti();
 }
 
 // ── SMASH ──
@@ -900,7 +857,14 @@ window.smash = () => {
 
   btn.classList.add('pressing', 'shake');
   setTimeout(() => btn.classList.remove('pressing', 'shake'), 150);
-  spawnFloatNum(btn);
+  
+  const el = document.createElement('div');
+  el.className = 'float-up';
+  el.textContent = '+1';
+  el.style.left = `calc(50% + ${(Math.random() - 0.5) * 80}px)`;
+  el.style.top = '30%';
+  btn.parentElement.appendChild(el);
+  setTimeout(() => el.remove(), 900);
 
   clickBuffer++;
   localCount++;
@@ -912,56 +876,25 @@ window.smash = () => {
         const toAdd = clickBuffer;
         clickBuffer = 0;
         try {
-          // Fix Race Condition by using Firebase Increment
-          await update(getGroupRef(currentRoom, currentGroupId), { 
-            clicks: increment(toAdd) 
-          });
+          await update(getGroupRef(currentRoom, currentGroupId), { clicks: increment(toAdd) });
         } catch(e) {}
       }
     }, 200);
   }
 };
 
-function spawnFloatNum(container) {
-  const el = document.createElement('div');
-  el.className = 'float-up';
-  el.textContent = '+1';
-  const offsetX = (Math.random() - 0.5) * 80;
-  el.style.left = `calc(50% + ${offsetX}px)`;
-  el.style.top = '30%';
-  container.parentElement.appendChild(el);
-  setTimeout(() => el.remove(), 900);
-}
-
-function spawnConfetti() {
-  const colors = ['#ff2244','#ffd700','#00e676','#00d4ff','#7c3aed','#ff9800'];
-  for (let i = 0; i < 60; i++) {
-    setTimeout(() => {
-      const el = document.createElement('div');
-      el.className = 'confetti-piece';
-      el.style.left = Math.random() * 100 + 'vw';
-      el.style.background = colors[Math.floor(Math.random() * colors.length)];
-      el.style.width = (6 + Math.random() * 8) + 'px';
-      el.style.height = (6 + Math.random() * 8) + 'px';
-      el.style.animationDuration = (1.5 + Math.random() * 2) + 's';
-      el.style.animationDelay = Math.random() * 0.5 + 's';
-      document.body.appendChild(el);
-      setTimeout(() => el.remove(), 3500);
-    }, i * 30);
-  }
-}
-
-// ── INIT SETUP PIN ──
+// ── INIT SETUP ──
 window.addEventListener('load', () => {
   pendingTeacherPin = generatePin();
   document.getElementById('setup-pin').textContent = pendingTeacherPin;
   
-  const pinInput = document.getElementById('join-pin');
-  pinInput.addEventListener('input', () => {
-    if (joinStep === 1) {
-      document.getElementById('join-error').style.display = 'none';
-    }
-  });
+  // Auto-fill PIN if student scans QR Code
+  const urlParams = new URLSearchParams(window.location.search);
+  const scannedPin = urlParams.get('pin');
+  if (scannedPin) {
+    document.getElementById('join-pin').value = scannedPin;
+    window.showScreen('screen-student-join');
+  }
 });
 </script>
 </body>
