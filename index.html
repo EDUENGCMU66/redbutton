@@ -9,6 +9,41 @@
 <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
 <style>
+  /* ── ปุ่มลบกลุ่ม (เตะออกจากห้อง) ── */
+  .btn-delete {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: rgba(255, 34, 68, 0.15);
+    border: none;
+    color: var(--red);
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+  }
+  .btn-delete:hover {
+    background: var(--red);
+    color: #fff;
+    transform: scale(1.1);
+  }
+
+  /* ── หน้าต่างประกาศผู้ชนะฝั่งครู ── */
+  #teacher-winner-overlay { z-index: 200; }
+  .winner-name-display {
+    font-family: var(--font-h);
+    font-size: clamp(3rem, 8vw, 4.5rem);
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(255,215,0,0.6);
+    margin-bottom: 10px;
+    text-align: center;
+  }
   :root {
     --red: #ff2244;
     --red-dark: #c0001f;
@@ -463,6 +498,13 @@
       </div>
     </div>
     <button class="btn btn-secondary" onclick="window.leaveRoom()" style="padding:10px 16px; font-size:0.85rem;">Exit</button>
+  <div class="result-overlay" id="teacher-winner-overlay">
+    <div class="result-emoji" style="font-size: 5rem;">🏆</div>
+    <div class="result-label" style="font-size: 1.5rem; margin-top: 10px;">The Winner is...</div>
+    <div class="winner-name-display" id="winner-name-display">Group Name</div>
+    <div style="font-size: 2.5rem; color:var(--cyan); font-family: var(--font-h); margin-bottom: 30px;" id="winner-score-display">0 Clicks</div>
+    <button class="btn btn-secondary" onclick="document.getElementById('teacher-winner-overlay').classList.remove('show')">ปิดหน้าต่าง</button>
+  </div>
   </div>
 
   <div class="timer-wrap" id="timer-section" style="display:none;">
@@ -623,7 +665,16 @@ window.leaveRoom = () => {
   document.getElementById('setup-pin').textContent = pendingTeacherPin;
   window.showScreen('screen-landing');
 };
-
+window.kickGroup = async (gid) => {
+  if (!currentRoom || !isTeacher) return;
+  if (confirm('ต้องการลบกลุ่มนี้ออกจากห้องใช่หรือไม่?')) {
+    try {
+      await remove(getGroupRef(currentRoom, gid));
+    } catch(e) {
+      alert("ไม่สามารถลบได้: " + e.message);
+    }
+  }
+};
 function listenTeacher(pin) {
   onValue(getGroupsRef(pin), snap => {
     const groups = snap.val() || {};
@@ -650,7 +701,14 @@ function renderGroups(groups) {
   grid.innerHTML = keys.map(k => {
     const g = groups[k];
     const isWinner = gamePhase === 'ended' && k === winner;
+    
+    // โชว์ปุ่มลบ (X) เฉพาะตอนที่เกมอยู่ในสถานะ waiting
+    const deleteBtn = gamePhase === 'waiting' 
+      ? `<button class="btn-delete" onclick="window.kickGroup('${k}')" title="ลบกลุ่มนี้">✖</button>` 
+      : '';
+
     return `<div class="group-card ${isWinner ? 'winner' : ''}">
+      ${deleteBtn}
       ${isWinner ? '<div class="winner-crown">👑</div>' : ''}
       <div class="avatar-wrap"><img src="${avatarUrl(g.name || k)}" alt="avatar"></div>
       <div class="g-name">${g.name || 'Group'}</div>
@@ -695,8 +753,30 @@ function startTeacherTimer(duration) {
       await update(getRoomRef(currentRoom), { phase: 'ended' });
       gamePhase = 'ended';
       document.getElementById('start-btn').disabled = false;
+      showTeacherWinnerPopup(); // เรียกฟังก์ชันโชว์ผู้ชนะเมื่อหมดเวลา
     }
   }, 1000);
+}
+
+// ฟังก์ชันหาผู้ชนะแล้วโชว์หน้าต่าง
+async function showTeacherWinnerPopup() {
+  const snap = await get(getGroupsRef(currentRoom));
+  const groups = snap.val() || {};
+  let max = -1;
+  let winnerName = 'No Data';
+  
+  Object.keys(groups).forEach(k => {
+    if ((groups[k].clicks || 0) > max) {
+      max = groups[k].clicks || 0;
+      winnerName = groups[k].name || 'Unknown Group';
+    }
+  });
+
+  if (max > 0) {
+    document.getElementById('winner-name-display').textContent = winnerName;
+    document.getElementById('winner-score-display').textContent = max + ' Clicks!';
+    document.getElementById('teacher-winner-overlay').classList.add('show');
+  }
 }
 
 function updateTimerUI(remaining, total) {
