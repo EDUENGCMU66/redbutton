@@ -902,8 +902,6 @@ function listenStudent(pin, gid) {
   onValue(getGroupRef(pin, gid), snap => {
     const g = snap.val();
     if (g) {
-      // เคล็ดลับความนิ่ง: รับค่าจากเซิร์ฟเวอร์เฉพาะตอนยังไม่เริ่มเกม หรือตอนโดนรีเซ็ตเป็น 0 เท่านั้น
-      // ป้องกันอาการ "เลขเด้งกลับ" เวลาเน็ตช้า
       if (gamePhase !== 'playing' || g.clicks === 0) {
         localCount = g.clicks || 0;
         lastSyncedCount = localCount;
@@ -913,7 +911,62 @@ function listenStudent(pin, gid) {
   });
 }
 
-// ── SMASH (เวอร์ชันเสถียรสูงสุด) ──
+function unlockButton() {
+  const btn = document.getElementById('big-btn');
+  btn.classList.remove('locked');
+  document.getElementById('s-status').textContent = '🔥 GO GO GO!';
+  document.getElementById('s-status').className = 'status-badge active';
+  document.getElementById('result-overlay').classList.remove('show');
+}
+
+function lockButton() {
+  const btn = document.getElementById('big-btn');
+  btn.classList.add('locked');
+  document.getElementById('s-status').textContent = '⏱ Time\'s Up!';
+  document.getElementById('s-status').className = 'status-badge ended';
+  document.getElementById('s-timer').classList.add('hidden');
+  
+  clearInterval(syncInterval);
+  syncInterval = null;
+}
+
+function resetStudentUI() {
+  localCount = 0;
+  lastSyncedCount = 0;
+  clearInterval(syncInterval);
+  syncInterval = null;
+  document.getElementById('s-count').textContent = '0';
+  document.getElementById('big-btn').classList.add('locked');
+  document.getElementById('s-status').textContent = '⏳ Waiting for teacher…';
+  document.getElementById('s-status').className = 'status-badge';
+  document.getElementById('s-timer').classList.add('hidden');
+  document.getElementById('result-overlay').classList.remove('show');
+  clearInterval(studentTimerInterval);
+}
+
+let studentTimerInterval = null;
+function startStudentTimer(remaining, total) {
+  clearInterval(studentTimerInterval);
+  const timerEl = document.getElementById('s-timer');
+  timerEl.classList.remove('hidden');
+  timerEl.textContent = remaining;
+  studentTimerInterval = setInterval(() => {
+    remaining--;
+    timerEl.textContent = Math.max(0, remaining);
+    if (remaining <= 3) timerEl.classList.add('urgent');
+    if (remaining <= 0) clearInterval(studentTimerInterval);
+  }, 1000);
+}
+
+function showStudentResult() {
+  const overlay = document.getElementById('result-overlay');
+  document.getElementById('result-count').textContent = localCount;
+  document.getElementById('result-emoji').textContent = localCount > 30 ? '🏆' : localCount > 15 ? '🎉' : '👏';
+  document.getElementById('result-msg').textContent = localCount > 25 ? 'Amazing! 🔥' : localCount > 10 ? 'Nice work!' : 'Keep it up!';
+  overlay.classList.add('show');
+}
+
+// ── SMASH (เวอร์ชันเสถียรสูงสุด + ปุ่มไม่สั่น + ไม่มี +1) ──
 window.smash = () => {
   if (gamePhase !== 'playing') return;
   const btn = document.getElementById('big-btn');
@@ -922,19 +975,18 @@ window.smash = () => {
   btn.classList.add('pressing');
   setTimeout(() => btn.classList.remove('pressing'), 150);
   
-  // อัปเดตฝั่งผู้เล่นทันที (Instant Feedback)
+  // อัปเดตฝั่งผู้เล่นทันที
   localCount++;
   document.getElementById('s-count').textContent = localCount;
 
-  // ส่งข้อมูลไปหลังบ้านด้วยความเร็วสูง (ทุก 100ms) แบบระบุค่าตรงๆ
+  // ส่งข้อมูลไปหลังบ้านรัวๆ
   if (!syncInterval) {
     syncInterval = setInterval(async () => {
       if (localCount > lastSyncedCount && currentRoom && currentGroupId) {
-        const toSync = localCount; // จำค่าล่าสุดที่จะส่ง
+        const toSync = localCount;
         try {
-          // ใช้ set() ทับค่าไปเลย จะเสถียรและเร็วกว่า increment() เมื่อเขียนจากฝั่งเดียว
           await set(ref(db, `rooms/${currentRoom}/groups/${currentGroupId}/clicks`), toSync);
-          lastSyncedCount = toSync; // อัปเดตว่าส่งค่ายอดนี้ไปแล้ว
+          lastSyncedCount = toSync;
         } catch(e) {}
       }
     }, 100); 
