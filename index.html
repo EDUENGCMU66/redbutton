@@ -572,7 +572,7 @@ let gamePhase = 'waiting';
 let localCount = 0;
 let joinStep = 1; 
 let pendingPin = null;
-let pendingTeacherPin = null; // Fix PIN mismatch
+let pendingTeacherPin = null;
 
 // ── HELPERS ──
 window.showScreen = (id) => {
@@ -596,14 +596,34 @@ function getGroupRef(pin, gid) { return ref(db, `rooms/${pin}/groups/${gid}`); }
 window.createRoom = async () => {
   const pin = pendingTeacherPin;
   const td = parseInt(document.getElementById('setup-timer').value) || 10;
-  await set(getRoomRef(pin), { pin, timerDuration: td, phase: 'waiting', createdAt: Date.now() });
-  currentRoom = pin;
-  timerDuration = td;
-  isTeacher = true;
-  document.getElementById('dash-pin').textContent = pin;
-  document.getElementById('dash-timer-input').value = td;
-  window.showScreen('screen-teacher');
-  listenTeacher(pin);
+  
+  // เปลี่ยนข้อความปุ่มระหว่างรอ
+  const btn = document.querySelector('#screen-teacher-setup .btn-primary');
+  btn.textContent = 'Creating...';
+  btn.disabled = true;
+
+  try {
+    // พยายามบันทึกข้อมูลลง Firebase
+    await set(getRoomRef(pin), { pin, timerDuration: td, phase: 'waiting', createdAt: Date.now() });
+    
+    // ถ้าสำเร็จ ให้เปลี่ยนหน้า
+    currentRoom = pin;
+    timerDuration = td;
+    isTeacher = true;
+    document.getElementById('dash-pin').textContent = pin;
+    document.getElementById('dash-timer-input').value = td;
+    window.showScreen('screen-teacher');
+    listenTeacher(pin);
+
+  } catch (error) {
+    // ถ้าไม่สำเร็จ ให้แจ้งเตือนสาเหตุ
+    alert("❌ ไม่สามารถสร้างห้องได้ สาเหตุ:\n" + error.message + "\n\n(อย่าลืมไปปรับ Rules ใน Firebase ให้เป็น true นะครับ)");
+    console.error(error);
+  } finally {
+    // คืนค่าปุ่มกลับมาเหมือนเดิม
+    btn.textContent = 'Create Room 🚀';
+    btn.disabled = false;
+  }
 };
 
 window.leaveRoom = () => {
@@ -611,16 +631,11 @@ window.leaveRoom = () => {
   if (currentRoom && isTeacher) remove(getRoomRef(currentRoom));
   currentRoom = null; currentGroupId = null; isTeacher = false;
   
-  // ── INIT SETUP PIN ──
-pendingTeacherPin = generatePin();
-document.getElementById('setup-pin').textContent = pendingTeacherPin;
-
-const pinInput = document.getElementById('join-pin');
-pinInput.addEventListener('input', () => {
-  if (joinStep === 1) {
-    document.getElementById('join-error').style.display = 'none';
-  }
-});
+  // Reset initial state for next setup
+  pendingTeacherPin = generatePin();
+  document.getElementById('setup-pin').textContent = pendingTeacherPin;
+  window.showScreen('screen-landing');
+};
 
 // ── TEACHER: LISTEN ──
 function listenTeacher(pin) {
