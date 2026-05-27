@@ -368,25 +368,11 @@
     pointer-events: none;
   }
 
-/* ── แก้ไข CSS เพื่อให้ปุ่มอยู่กับที่ ── */
   .big-btn-wrap.pressing .big-btn-top {
-    /* transform: translateY(8px) scale(0.97); */ /* คอมเมนต์หรือลบบรรทัดนี้ออก เพื่อไม่ให้ปุ่มขยับลงและย่อตัว */
-    box-shadow: 0 2px 6px rgba(0,0,0,0.6) inset, 0 0 60px rgba(255,34,68,0.6); /* เก็บแสงเรืองรองไว้ เพื่อบอกว่ากดแล้ว */
+    box-shadow: 0 2px 6px rgba(0,0,0,0.6) inset, 0 0 60px rgba(255,34,68,0.6);
   }
   .big-btn-wrap.pressing .big-btn-shadow { width: 85%; opacity: 0.5; }
   .big-btn-wrap.pressing .big-btn-icon { transform: scale(0.9); }
-
-  .big-btn-wrap.shake {
-    animation: btnShake 0.15s ease;
-  }
-  @keyframes btnShake {
-    0% { transform: translate(0,0) rotate(0); }
-    20% { transform: translate(-4px, 2px) rotate(-2deg); }
-    40% { transform: translate(4px, -2px) rotate(2deg); }
-    60% { transform: translate(-3px, 1px) rotate(-1deg); }
-    80% { transform: translate(3px, -1px) rotate(1deg); }
-    100% { transform: translate(0,0) rotate(0); }
-  }
 
   .big-btn-wrap.locked .big-btn-top { filter: brightness(0.5) saturate(0.3); cursor: not-allowed; }
   .big-btn-wrap.locked { cursor: not-allowed; }
@@ -421,7 +407,7 @@
 
   /* ── EMPTY STATE ── */
   .empty-state { color: var(--muted); font-weight: 700; font-size: 0.9rem; text-align: center; padding: 24px; }
-/* ── COPYRIGHT FOOTER ── */
+  /* ── COPYRIGHT FOOTER ── */
   .copyright-footer {
     position: fixed;
     bottom: 12px;
@@ -433,7 +419,7 @@
     font-weight: 700;
     letter-spacing: 0.05em;
     z-index: 1000;
-    pointer-events: none; /* เพื่อไม่ให้ตัวหนังสือไปขัดขวางการกดปุ่ม */
+    pointer-events: none;
     opacity: 0.6;
   }
 </style>
@@ -579,10 +565,7 @@ import { getDatabase, ref, set, get, update, onValue, remove, push, increment }
 const firebaseConfig = {
   apiKey: "AIzaSyDtyNbOFT8UVan7-jvpLf1BN5tbpfn-BBQ",
   authDomain: "redbotton-3151e.firebaseapp.com",
-  
-  // 👇 เพิ่มบรรทัดนี้ และวางลิงก์ที่คุณก็อปปี้มา (อย่าลืมใส่ลูกน้ำด้านหลัง)
   databaseURL: "https://redbotton-3151e-default-rtdb.asia-southeast1.firebasedatabase.app", 
-  
   projectId: "redbotton-3151e",
   storageBucket: "redbotton-3151e.firebasestorage.app",
   messagingSenderId: "100948480364",
@@ -603,6 +586,9 @@ let timerRemaining = 10;
 let gamePhase = 'waiting'; 
 let localCount = 0;
 let pendingTeacherPin = null;
+let syncInterval = null;
+let lastSyncedCount = 0;
+let studentTimerInterval = null;
 
 // ── HELPERS ──
 window.showScreen = (id) => {
@@ -665,6 +651,7 @@ window.leaveRoom = () => {
   document.getElementById('setup-pin').textContent = pendingTeacherPin;
   window.showScreen('screen-landing');
 };
+
 window.kickGroup = async (gid) => {
   if (!currentRoom || !isTeacher) return;
   if (confirm('ต้องการลบกลุ่มนี้ออกจากห้องใช่หรือไม่?')) {
@@ -675,6 +662,7 @@ window.kickGroup = async (gid) => {
     }
   }
 };
+
 function listenTeacher(pin) {
   onValue(getGroupsRef(pin), snap => {
     const groups = snap.val() || {};
@@ -702,17 +690,15 @@ function renderGroups(groups) {
     keys.forEach(k => { if ((groups[k].clicks||0) > max) { max = groups[k].clicks||0; winner = k; } });
   }
 
-  // 🔴 เคล็ดลับความเสถียรฝั่งครู: 
-  // ถ้าเกมกำลังเล่นอยู่ และจำนวนกลุ่มเท่าเดิม ให้ดึงไปอัปเดตแค่ "ตัวเลขคะแนน" (ลดการกระตุก 100%)
+  // 🔴 เคล็ดลับความเสถียรฝั่งครู
   if (gamePhase === 'playing' && grid.children.length === keys.length) {
     keys.forEach(k => {
       const countEl = document.getElementById(`gc-${k}`);
       if (countEl) countEl.textContent = groups[k].clicks || 0;
     });
-    return; // จบการทำงานตรงนี้ ไม่ต้องสร้าง HTML ใหม่
+    return; 
   }
 
-  // ถ้าเพิ่งรอเริ่มเกม หรือเกมจบแล้ว ค่อยสร้าง HTML เต็มรูปแบบ
   grid.innerHTML = keys.map(k => {
     const g = groups[k];
     const isWinner = gamePhase === 'ended' && k === winner;
@@ -766,12 +752,11 @@ function startTeacherTimer(duration) {
       await update(getRoomRef(currentRoom), { phase: 'ended' });
       gamePhase = 'ended';
       document.getElementById('start-btn').disabled = false;
-      showTeacherWinnerPopup(); // เรียกฟังก์ชันโชว์ผู้ชนะเมื่อหมดเวลา
+      showTeacherWinnerPopup(); 
     }
   }, 1000);
 }
 
-// ฟังก์ชันหาผู้ชนะแล้วโชว์หน้าต่าง
 async function showTeacherWinnerPopup() {
   const snap = await get(getGroupsRef(currentRoom));
   const groups = snap.val() || {};
@@ -818,7 +803,7 @@ window.resetGame = async () => {
   await update(ref(db), updates);
 };
 
-// ── STUDENT: JOIN (STREAMLINED) ──
+// ── STUDENT: JOIN ──
 window.handleJoin = async () => {
   const pin = document.getElementById('join-pin').value.trim();
   const name = document.getElementById('join-name').value.trim();
@@ -844,8 +829,6 @@ window.handleJoin = async () => {
       joinBtn.textContent = 'Join Room →';
       return;
     }
-    
-    // Jump straight into the room
     await joinRoom(pin, name);
   } catch(error) {
     errEl.textContent = '❌ เชื่อมต่อไม่สำเร็จ: ' + error.message;
@@ -872,9 +855,6 @@ async function joinRoom(pin, name) {
   window.showScreen('screen-student');
   listenStudent(pin, gid);
 }
-
-let syncInterval = null;
-let lastSyncedCount = 0;
 
 function listenStudent(pin, gid) {
   onValue(ref(db, `rooms/${pin}/phase`), snap => {
@@ -944,7 +924,6 @@ function resetStudentUI() {
   clearInterval(studentTimerInterval);
 }
 
-let studentTimerInterval = null;
 function startStudentTimer(remaining, total) {
   clearInterval(studentTimerInterval);
   const timerEl = document.getElementById('s-timer');
@@ -966,7 +945,7 @@ function showStudentResult() {
   overlay.classList.add('show');
 }
 
-// ── SMASH (เวอร์ชันเสถียรสูงสุด + ปุ่มไม่สั่น + ไม่มี +1) ──
+// ── SMASH (เสถียร + ไม่สั่น + ไม่มี +1) ──
 window.smash = () => {
   if (gamePhase !== 'playing') return;
   const btn = document.getElementById('big-btn');
@@ -979,7 +958,7 @@ window.smash = () => {
   localCount++;
   document.getElementById('s-count').textContent = localCount;
 
-  // ส่งข้อมูลไปหลังบ้านรัวๆ
+  // ส่งข้อมูลไปหลังบ้านรัวๆ อย่างเสถียร
   if (!syncInterval) {
     syncInterval = setInterval(async () => {
       if (localCount > lastSyncedCount && currentRoom && currentGroupId) {
@@ -993,105 +972,11 @@ window.smash = () => {
   }
 };
 
-function lockButton() {
-  const btn = document.getElementById('big-btn');
-  btn.classList.add('locked');
-  document.getElementById('s-status').textContent = '⏱ Time\'s Up!';
-  document.getElementById('s-status').className = 'status-badge ended';
-  document.getElementById('s-timer').classList.add('hidden');
-  
-  // หยุดการซิงค์เมื่อหมดเวลา
-  clearInterval(syncInterval);
-  syncInterval = null;
-}
-
-function resetStudentUI() {
-  localCount = 0;
-  lastSyncedCount = 0;
-  clearInterval(syncInterval);
-  syncInterval = null;
-  document.getElementById('s-count').textContent = '0';
-  document.getElementById('big-btn').classList.add('locked');
-  document.getElementById('s-status').textContent = '⏳ Waiting for teacher…';
-  document.getElementById('s-status').className = 'status-badge';
-  document.getElementById('s-timer').classList.add('hidden');
-  document.getElementById('result-overlay').classList.remove('show');
-  clearInterval(studentTimerInterval);
-}
-
-let studentTimerInterval = null;
-function startStudentTimer(remaining, total) {
-  clearInterval(studentTimerInterval);
-  const timerEl = document.getElementById('s-timer');
-  timerEl.classList.remove('hidden');
-  timerEl.textContent = remaining;
-  studentTimerInterval = setInterval(() => {
-    remaining--;
-    timerEl.textContent = Math.max(0, remaining);
-    if (remaining <= 3) timerEl.classList.add('urgent');
-    if (remaining <= 0) clearInterval(studentTimerInterval);
-  }, 1000);
-}
-
-function showStudentResult() {
-  const overlay = document.getElementById('result-overlay');
-  document.getElementById('result-count').textContent = localCount;
-  document.getElementById('result-emoji').textContent = localCount > 30 ? '🏆' : localCount > 15 ? '🎉' : '👏';
-  document.getElementById('result-msg').textContent = localCount > 25 ? 'Amazing! 🔥' : localCount > 10 ? 'Nice work!' : 'Keep it up!';
-  overlay.classList.add('show');
-  // if (localCount > 5) spawnConfetti();
-}
-
-// ── SMASH ──
-let clickBuffer = 0;
-let flushInterval = null;
-
-// ── แก้ไขฟังก์ชัน SMASH ──
-window.smash = () => {
-  if (gamePhase !== 'playing') return;
-  const btn = document.getElementById('big-btn');
-  if (btn.classList.contains('locked')) return;
-
-  // --- แก้ไขตรงนี้ ---
-  // นำ 'shake' ออก (เพื่อให้ปุ่มไม่สั่น) เหลือแค่ 'pressing' เพื่อแสดงผลแสง
-  btn.classList.add('pressing'); 
-  setTimeout(() => btn.classList.remove('pressing'), 150);
-  
-  // --- คอมเมนต์หรือลบโค้ดส่วนนี้ออกทั้งหมด เพื่อเอา +1 ออก ---
-  /*
-  const el = document.createElement('div');
-  el.className = 'float-up';
-  el.textContent = '+1';
-  el.style.left = `calc(50% + ${(Math.random() - 0.5) * 80}px)`;
-  el.style.top = '30%';
-  btn.parentElement.appendChild(el);
-  setTimeout(() => el.remove(), 900);
-  */
-  // --- จบการแก้ไข ---
-
-  clickBuffer++;
-  localCount++;
-  document.getElementById('s-count').textContent = localCount;
-
-  if (!flushInterval) {
-    flushInterval = setInterval(async () => {
-      if (clickBuffer > 0 && currentRoom && currentGroupId) {
-        const toAdd = clickBuffer;
-        clickBuffer = 0;
-        try {
-          await update(getGroupRef(currentRoom, currentGroupId), { clicks: increment(toAdd) });
-        } catch(e) {}
-      }
-    }, 200);
-  }
-};
-
 // ── INIT SETUP ──
 window.addEventListener('load', () => {
   pendingTeacherPin = generatePin();
   document.getElementById('setup-pin').textContent = pendingTeacherPin;
   
-  // Auto-fill PIN if student scans QR Code
   const urlParams = new URLSearchParams(window.location.search);
   const scannedPin = urlParams.get('pin');
   if (scannedPin) {
