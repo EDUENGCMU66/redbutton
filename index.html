@@ -690,7 +690,11 @@ function renderGroups(groups) {
   const grid = document.getElementById('groups-grid');
   const keys = Object.keys(groups);
   document.getElementById('group-count').textContent = keys.length ? `(${keys.length})` : '';
-  if (!keys.length) { grid.innerHTML = '<div class="empty-state">No groups yet. Share the PIN or QR!</div>'; return; }
+  
+  if (!keys.length) { 
+    grid.innerHTML = '<div class="empty-state">No groups yet. Share the PIN or QR!</div>'; 
+    return; 
+  }
 
   let winner = null;
   if (gamePhase === 'ended') {
@@ -698,11 +702,20 @@ function renderGroups(groups) {
     keys.forEach(k => { if ((groups[k].clicks||0) > max) { max = groups[k].clicks||0; winner = k; } });
   }
 
+  // 🔴 เคล็ดลับความเสถียรฝั่งครู: 
+  // ถ้าเกมกำลังเล่นอยู่ และจำนวนกลุ่มเท่าเดิม ให้ดึงไปอัปเดตแค่ "ตัวเลขคะแนน" (ลดการกระตุก 100%)
+  if (gamePhase === 'playing' && grid.children.length === keys.length) {
+    keys.forEach(k => {
+      const countEl = document.getElementById(`gc-${k}`);
+      if (countEl) countEl.textContent = groups[k].clicks || 0;
+    });
+    return; // จบการทำงานตรงนี้ ไม่ต้องสร้าง HTML ใหม่
+  }
+
+  // ถ้าเพิ่งรอเริ่มเกม หรือเกมจบแล้ว ค่อยสร้าง HTML เต็มรูปแบบ
   grid.innerHTML = keys.map(k => {
     const g = groups[k];
     const isWinner = gamePhase === 'ended' && k === winner;
-    
-    // โชว์ปุ่มลบ (X) เฉพาะตอนที่เกมอยู่ในสถานะ waiting
     const deleteBtn = gamePhase === 'waiting' 
       ? `<button class="btn-delete" onclick="window.kickGroup('${k}')" title="ลบกลุ่มนี้">✖</button>` 
       : '';
@@ -860,6 +873,9 @@ async function joinRoom(pin, name) {
   listenStudent(pin, gid);
 }
 
+let syncInterval = null;
+let lastSyncedCount = 0;
+
 function listenStudent(pin, gid) {
   onValue(ref(db, `rooms/${pin}/phase`), snap => {
     const ph = snap.val();
@@ -886,19 +902,44 @@ function listenStudent(pin, gid) {
   onValue(getGroupRef(pin, gid), snap => {
     const g = snap.val();
     if (g) {
-      localCount = g.clicks || 0;
-      document.getElementById('s-count').textContent = localCount;
+      // เคล็ดลับความนิ่ง: รับค่าจากเซิร์ฟเวอร์เฉพาะตอนยังไม่เริ่มเกม หรือตอนโดนรีเซ็ตเป็น 0 เท่านั้น
+      // ป้องกันอาการ "เลขเด้งกลับ" เวลาเน็ตช้า
+      if (gamePhase !== 'playing' || g.clicks === 0) {
+        localCount = g.clicks || 0;
+        lastSyncedCount = localCount;
+        document.getElementById('s-count').textContent = localCount;
+      }
     }
   });
 }
 
-function unlockButton() {
+// ── SMASH (เวอร์ชันเสถียรสูงสุด) ──
+window.smash = () => {
+  if (gamePhase !== 'playing') return;
   const btn = document.getElementById('big-btn');
-  btn.classList.remove('locked');
-  document.getElementById('s-status').textContent = '🔥 GO GO GO!';
-  document.getElementById('s-status').className = 'status-badge active';
-  document.getElementById('result-overlay').classList.remove('show');
-}
+  if (btn.classList.contains('locked')) return;
+
+  btn.classList.add('pressing');
+  setTimeout(() => btn.classList.remove('pressing'), 150);
+  
+  // อัปเดตฝั่งผู้เล่นทันที (Instant Feedback)
+  localCount++;
+  document.getElementById('s-count').textContent = localCount;
+
+  // ส่งข้อมูลไปหลังบ้านด้วยความเร็วสูง (ทุก 100ms) แบบระบุค่าตรงๆ
+  if (!syncInterval) {
+    syncInterval = setInterval(async () => {
+      if (localCount > lastSyncedCount && currentRoom && currentGroupId) {
+        const toSync = localCount; // จำค่าล่าสุดที่จะส่ง
+        try {
+          // ใช้ set() ทับค่าไปเลย จะเสถียรและเร็วกว่า increment() เมื่อเขียนจากฝั่งเดียว
+          await set(ref(db, `rooms/${currentRoom}/groups/${currentGroupId}/clicks`), toSync);
+          lastSyncedCount = toSync; // อัปเดตว่าส่งค่ายอดนี้ไปแล้ว
+        } catch(e) {}
+      }
+    }, 100); 
+  }
+};
 
 function lockButton() {
   const btn = document.getElementById('big-btn');
@@ -906,10 +947,17 @@ function lockButton() {
   document.getElementById('s-status').textContent = '⏱ Time\'s Up!';
   document.getElementById('s-status').className = 'status-badge ended';
   document.getElementById('s-timer').classList.add('hidden');
+  
+  // หยุดการซิงค์เมื่อหมดเวลา
+  clearInterval(syncInterval);
+  syncInterval = null;
 }
 
 function resetStudentUI() {
   localCount = 0;
+  lastSyncedCount = 0;
+  clearInterval(syncInterval);
+  syncInterval = null;
   document.getElementById('s-count').textContent = '0';
   document.getElementById('big-btn').classList.add('locked');
   document.getElementById('s-status').textContent = '⏳ Waiting for teacher…';
